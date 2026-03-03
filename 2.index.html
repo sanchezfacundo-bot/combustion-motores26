@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Combustión de los Motores Endotérmicos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{font-family:Arial;background:#f4f6fb;margin:0}
+#inicio{text-align:center;margin-top:80px}
+#app{display:none}
+header{background:#1f3c88;color:white;padding:15px}
+
+#layout{
+  display:grid;
+  grid-template-columns: 1fr 260px;
+}
+
+section{
+  background:white;
+  margin:15px;
+  padding:15px;
+  border-radius:8px;
+}
+
+aside{
+  background:#e8ecf7;
+  padding:15px;
+  margin:15px;
+  border-radius:8px;
+  font-size:14px;
+}
+
+h2{color:#1f3c88}
+
+input,select,button{
+  padding:6px;
+  margin:4px;
+}
+
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #aaa;text-align:center;padding:4px}
+
+button{
+  background:#1f3c88;
+  color:white;
+  border:none;
+  border-radius:4px;
+  cursor:pointer;
+}
+button:hover{opacity:0.85}
+</style>
+</head>
+
+<body>
+
+<div id="inicio">
+<h1>Combustión de los Motores Endotérmicos</h1>
+<p>Ingrese nombre y apellido</p>
+<input id="nombreAlumno">
+<br><br>
+<button onclick="comenzar()">Comenzar</button>
+</div>
+
+<div id="app">
+
+<header>
+Alumno: <strong id="mostrarNombre"></strong>
+<button onclick="reiniciar()" style="float:right">Salir</button>
+</header>
+
+<div id="layout">
+
+<div id="contenido">
+
+<section>
+<h2>1️⃣ Cálculo de Cilindrada</h2>
+Diámetro (mm): <input id="diam"><br>
+Carrera (mm): <input id="carr"><br>
+Cilindros: <input id="cil"><br>
+<button onclick="calcularCil()">Calcular</button>
+<p id="resCil"></p>
+</section>
+
+<section>
+<h2>2️⃣ Potencia – Par – RPM</h2>
+<select id="modo">
+<option value="P">Calcular Potencia</option>
+<option value="M">Calcular Par</option>
+<option value="N">Calcular RPM</option>
+</select><br>
+Par (Nm): <input id="par"><br>
+RPM: <input id="rpm"><br>
+Potencia (kW): <input id="pot"><br>
+<button onclick="calcPMN()">Calcular</button>
+<p id="resPMN"></p>
+</section>
+
+<section>
+<h2>3️⃣ Potencia Indicada (PMI)</h2>
+Volumen total motor (dm³): <input id="vt"><br><br>
+
+Color de curva:
+<select id="colorCurva">
+<option value="blue">Azul</option>
+<option value="red">Rojo</option>
+<option value="green">Verde</option>
+<option value="orange">Naranja</option>
+</select>
+
+<table id="tabla">
+<tr><th>RPM</th><th>PMI (bar)</th><th>P (kW)</th><th>P (HP)</th></tr>
+</table>
+
+<button onclick="generarGrafico()">Generar curva</button>
+<canvas id="graf"></canvas>
+</section>
+
+<section>
+<button onclick="descargarImagen()">Descargar Imagen</button>
+<button onclick="descargarPDF()">Descargar PDF</button>
+</section>
+
+</div>
+
+<aside>
+<h3>Datos del alumno</h3>
+<p><b>Alumno:</b><br><span id="panelNombre"></span></p>
+<p><b>Materia:</b><br>Combustión de los Motores Endotérmicos</p>
+<p><b>Estado:</b><br>Trabajo en curso</p>
+</aside>
+
+</div>
+</div>
+
+<script>
+let chart;
+const rpms=[1000,2000,3000,4000,5000,6000,7000,8000];
+
+function comenzar(){
+ const n=nombreAlumno.value.trim();
+ if(!n){alert("Ingrese nombre");return;}
+ localStorage.setItem("alumno",n);
+ inicio.style.display="none";
+ app.style.display="block";
+ mostrarNombre.innerText=n;
+ panelNombre.innerText=n;
+ crearTabla();
+}
+
+function reiniciar(){
+ if(confirm("Se borrará todo")){
+  localStorage.clear();
+  location.reload();
+ }
+}
+
+function calcularCil(){
+ const d=diam.value/10, c=carr.value/10, z=cil.value;
+ const vu=Math.PI*(d*d/4)*c;
+ const vt=vu*z;
+ document.getElementById("vt").value=(vt/1000).toFixed(2);
+ resCil.innerHTML=`Cilindrada total: <b>${vt.toFixed(0)} cm³</b>`;
+}
+
+function calcPMN(){
+ const M=par.value, n=rpm.value, P=pot.value;
+ let r="";
+ if(modo.value==="P") r=(M*n/9550).toFixed(2)+" kW";
+ if(modo.value==="M") r=(P*9550/n).toFixed(2)+" Nm";
+ if(modo.value==="N") r=(P*9550/M).toFixed(0)+" rpm";
+ resPMN.innerText=r;
+}
+
+function crearTabla(){
+ rpms.forEach(r=>{
+  const tr=tabla.insertRow();
+  tr.insertCell().innerText=r;
+  tr.insertCell().innerHTML="<input>";
+  tr.insertCell();
+  tr.insertCell();
+ });
+}
+
+function generarGrafico(){
+ const vt=document.getElementById("vt").value;
+ let xs=[], ys=[];
+ for(let i=1;i<tabla.rows.length;i++){
+  const rpm=tabla.rows[i].cells[0].innerText;
+  const pmi=tabla.rows[i].cells[1].children[0].value;
+  if(pmi){
+   const P=vt*pmi*rpm/1200;
+   tabla.rows[i].cells[2].innerText=P.toFixed(2);
+   tabla.rows[i].cells[3].innerText=(P*1.36).toFixed(2);
+   xs.push(rpm);
+   ys.push(P);
+  }
+ }
+
+ let maxP=Math.max(...ys);
+ let idx=ys.indexOf(maxP);
+
+ if(chart) chart.destroy();
+ chart=new Chart(graf,{
+  type:'line',
+  data:{
+   labels:xs,
+   datasets:[
+    {
+     label:'Potencia indicada (kW)',
+     data:ys,
+     borderColor:colorCurva.value,
+     tension:0.4,
+     fill:false
+    },
+    {
+     label:'Punto máximo',
+     data: ys.map((v,i)=> i===idx ? v : null),
+     borderColor:'red',
+     backgroundColor:'red',
+     pointRadius:6,
+     showLine:false
+    }
+   ]
+  },
+  options:{
+   plugins:{
+    tooltip:{
+     callbacks:{
+      label:(ctx)=> ctx.raw===maxP ? 
+      `P máx = ${maxP.toFixed(2)} kW a ${xs[idx]} rpm` :
+      ctx.raw
+     }
+    }
+   },
+   scales:{
+    x:{title:{display:true,text:'RPM'}},
+    y:{title:{display:true,text:'Potencia (kW)'}}
+   }
+  }
+ });
+}
+
+function descargarImagen(){
+ html2canvas(document.getElementById("layout")).then(c=>{
+  const a=document.createElement("a");
+  a.href=c.toDataURL();
+  a.download=panelNombre.innerText+"_combustion.png";
+  a.click();
+ });
+}
+
+function descargarPDF(){
+ html2canvas(document.getElementById("layout")).then(c=>{
+  const pdf=new jspdf.jsPDF();
+  pdf.addImage(c.toDataURL(),"PNG",10,10,190,0);
+  pdf.save(panelNombre.innerText+"_combustion.pdf");
+ });
+}
+</script>
+
+</body>
+</html>
